@@ -255,3 +255,45 @@ func Test_toNodes_slice_maps(t *testing.T) {
 		assert.Equal(t, fmt.Sprint(c), ns[0].Value)
 	}
 }
+
+func Test_toNodes_slice_struct(t *testing.T) {
+	test := []interface{}{
+		struct{ A string }{A: "a"},
+		&struct{ B int }{B: 1},
+		struct{ C *struct{ D int } }{C: &struct{ D int }{D: 1}},
+		&struct{ E *struct{ F int } }{E: &struct{ F int }{F: 1}},
+		&struct{ G struct{ H int } }{G: struct{ H int }{H: 1}},
+	}
+
+	want := []Node{
+		{
+			Name:  "A",
+			Value: "a",
+		},
+		{
+			Name:  "B",
+			Value: "1",
+		},
+		{
+			Name:  "D",
+			Value: "1",
+		},
+		{
+			Name:  "F",
+			Value: "1",
+		},
+		{
+			Name:  "H",
+			Value: "1",
+		},
+	}
+
+	v := reflect.ValueOf(&test)
+	nodes, err := toNodes(v.Type(), 0, v)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	assert.Equal(t, 5, len(nodes))
+	assert.Equal(t, want, nodes)
+}

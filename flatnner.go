@@ -8,13 +8,15 @@ import (
 	"github.com/golang/protobuf/proto"
 )
 
+// Node represents a single field in a proto.Message
 type Node struct {
 	Name  string
 	Value string
 }
 
+// Flatten makes nodes from proto.Message
 func Flatten(data proto.Message) (nodes []Node, err error) {
-	dv := reflect.ValueOf(data).Elem()
+	dv := reflect.ValueOf(data)
 	return toNodes(dv.Type(), 0, dv)
 }
 
@@ -25,6 +27,7 @@ func toNodes(t reflect.Type, i int, v reflect.Value) (nodes []Node, err error) {
 	}
 
 	// unexported field. skipping
+	// TODO test for nil pointers and zero value
 	if !v.CanInterface() {
 		return nil, nil
 	}
@@ -38,11 +41,35 @@ func toNodes(t reflect.Type, i int, v reflect.Value) (nodes []Node, err error) {
 			return nil, fmt.Errorf("failed to flatten struct: %v", err)
 		}
 		return nodes, nil
+	case reflect.Slice, reflect.Array:
+		return flattenSlice(t, i, v)
 	case reflect.Chan, reflect.UnsafePointer, reflect.Func, reflect.Uintptr:
 		return nil, fmt.Errorf("unsupported type: %T", v)
 	}
 
 	return newNode(getName(t, i), fmt.Sprint(v.Interface())), nil
+}
+
+func flattenSlice(t reflect.Type, i int, v reflect.Value) (nodes []Node, err error) {
+	if v.IsNil() || v.Len() == 0 {
+		return newNode(getName(t, i), ""), nil
+	}
+
+	switch v.Index(0).Type().Kind() {
+	case reflect.Ptr, reflect.Interface, reflect.Struct:
+		for j := 0; j < v.Len(); j++ {
+			ns, err := toNodes(v.Index(j).Type(), j, v.Index(j))
+			if err != nil {
+				return nil, err
+			}
+
+			nodes = append(nodes, ns...)
+		}
+
+		return nodes, nil
+	}
+
+	return newNode(getName(t, i), fmt.Sprint(v)), nil
 }
 
 func flattenStruct(v reflect.Value) (nodes []Node, err error) {
