@@ -16,6 +16,15 @@ type Node struct {
 
 // Flatten makes nodes from proto.Message
 func Flatten(data proto.Message) (nodes []Node, err error) {
+	defer func() {
+		err := recover()
+		if err == nil {
+			return
+		}
+
+		err = fmt.Errorf("%v", err)
+	}()
+
 	dv := reflect.ValueOf(data)
 	return toNodes(dv.Type(), 0, dv)
 }
@@ -27,7 +36,6 @@ func toNodes(t reflect.Type, i int, v reflect.Value) (nodes []Node, err error) {
 	}
 
 	// unexported field. skipping
-	// TODO test for nil pointers and zero value
 	if !v.CanInterface() {
 		return nil, nil
 	}
